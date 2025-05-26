@@ -88,12 +88,12 @@ stages:
         flavor: g3
         command: >-
           export PT_HPU_LAZY_MODE=0 && export VLLM_CONTIGUOUS_PA=false && export VLLM_USE_V1=1 && 
-          cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-small.txt -t 1 -a
+          cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-small.txt -t 2 -a
       - name: v1_gsm8k_small_g2_tp1_apc
         flavor: g2
         command: >-
           export PT_HPU_LAZY_MODE=0 && export VLLM_CONTIGUOUS_PA=false && export VLLM_USE_V1=1 && 
-          cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-small.txt -t 1 -a
+          cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-small.txt -t 2 -a
   # - name: test_gsm8k_large_models
   #   steps:
       # - name: v0_gsm8k_large_g3_tp2_part1
