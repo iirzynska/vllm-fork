@@ -2473,9 +2473,8 @@ class HPUModelRunnerBase(ModelRunnerBase[TModelInputForHPU]):
                     ctx=ctx) for i in range(batch_size)
             ]
         else:
-            # FIXME: seq_len is actually number of blocks
-            blocks = [seq_len // batch_size for _ in range(batch_size)]
-            blocks[0] += seq_len % batch_size
+            blocks = [ctx // batch_size for _ in range(batch_size)]
+            blocks[0] += ctx % batch_size
             seqs = [
                 self.create_dummy_seq_group_metadata(
                     i,
@@ -3734,4 +3733,9 @@ class HPUModelRunner(HPUModelRunnerBase[ModelInputForHPUWithSamplingMetadata]):
                 logprobs has {len(delayed_prompt_logprobs)} entries!'''
             for sg, real_logprobs in zip(seq_groups, delayed_prompt_logprobs):
                 if real_logprobs is not None:
-                    sg.seq_group.prompt_logprobs = real_logprobs
+                    # Prepending None just like in vllm.engine.output_processor\
+                    # .single_step.single_step_process_prompt_logprob, but
+                    # hence we are not going through async output processor
+                    # with data from prompt in delayed sampling scenario we
+                    # need to do that manually.
+                    sg.seq_group.prompt_logprobs = [None] + real_logprobs
