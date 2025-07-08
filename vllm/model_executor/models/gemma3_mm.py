@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 import math
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, Literal, Optional, Set, Tuple, TypedDict
+from typing import Any, Literal, Optional, TypedDict
 
 import torch
 from torch import nn
@@ -29,6 +30,7 @@ from vllm.multimodal.processing import (BaseMultiModalProcessor,
                                         replace_token_matches)
 # yapf: enable
 from vllm.multimodal.profiling import BaseDummyInputsBuilder
+from vllm.platforms import current_platform
 from vllm.sequence import IntermediateTensors
 
 from .interfaces import (MultiModalEmbeddings, SupportsLoRA,
@@ -38,6 +40,8 @@ from .utils import (AutoWeightsLoader, flatten_bn, init_vllm_registered_model,
                     maybe_prefix, merge_multimodal_embeddings)
 
 logger = init_logger(__name__)
+
+is_hpu = current_platform.is_hpu()
 
 
 class Gemma3ImagePixelInputs(TypedDict):
@@ -504,18 +508,12 @@ class Gemma3ForConditionalGeneration(nn.Module, SupportsMultiModal, SupportsPP,
         return next(self.parameters()).dtype
 
     def _validate_pixel_values(self, data: torch.Tensor) -> torch.Tensor:
-        h = w = self.config.vision_config.image_size
-        expected_dims = (3, h, w)
-
-        def _validate_shape(d: torch.Tensor):
-            if d.shape != expected_dims:
-                raise ValueError(
-                    "The expected shape of pixel values per image per batch "
-                    f"is {expected_dims}. You supplied {tuple(d.shape)}.")
-
-        for d in data:
-            _validate_shape(d)
-
+        image_size = self.config.vision_config.image_size
+        expected_dims = (3, image_size, image_size)
+        if data.shape[1:] != expected_dims:
+            raise ValueError(
+                "The expected shape of pixel values per image per batch is "
+                f"{expected_dims}. You supplied {tuple(data.shape)}.")
         return data
 
     def _parse_and_validate_image_input(
@@ -541,17 +539,19 @@ class Gemma3ForConditionalGeneration(nn.Module, SupportsMultiModal, SupportsPP,
         return Gemma3ImagePixelInputs(
             type="pixel_values",
             pixel_values=self._validate_pixel_values(pixel_values),
-            num_patches=num_crops + 1,
-        )
+            # TODO.. some bug in adding 1 here to num_crops..
+            # currently assuming no panscan so just passing in torch.ones
+            # seeing 0 + 1 = 0 here sometimes!! hence wrapping in torch.tensor
+            num_patches=num_crops + 1 if not is_hpu else \
+                torch.ones(num_crops.shape, dtype=num_crops.dtype).to(
+                    pixel_values.device))
 
     def _image_pixels_to_features(
         self,
         vision_tower: SiglipVisionModel,
         pixel_values: torch.Tensor,
     ) -> torch.Tensor:
-        target_dtype = vision_tower.get_input_embeddings().weight.dtype
-        image_features = vision_tower(pixel_values.to(dtype=target_dtype))
-        return image_features
+        return vision_tower(pixel_values)
 
     def _process_image_input(
         self,
@@ -639,30 +639,42 @@ class Gemma3ForConditionalGeneration(nn.Module, SupportsMultiModal, SupportsPP,
         **kwargs,
     ):
         kwargs["has_images"] = True
-        # NOTE(woosuk): Here, we distinguish the sequences by the position id 0.
-        # This is a HACK. Fix this.
-        start_idices = (positions == 0).cpu().nonzero()
-        num_seqs = len(start_idices)
         seq_lens = []
-        for i in range(num_seqs):
-            start_idx = start_idices[i].item()
-            if i < num_seqs - 1:
-                end_idx = start_idices[i + 1].item()
-            else:
-                end_idx = len(input_ids)
-            seq_lens.append(end_idx - start_idx)
-        kwargs["seq_lens"] = seq_lens
+        if is_hpu:
+            IMG_TOKENS = self.config.mm_tokens_per_image
+            seq_len = input_ids.shape[1]
+            bs = input_ids.shape[0]
+            kwargs["seq_lens"] = [seq_len] * bs
+            seq_lens.append(seq_len)
+        else:
+            # NOTE(woosuk): Here, we distinguish the sequences
+            # by the position id 0.
+            # This is a HACK. Fix this.
+            start_idices = (positions == 0).cpu().nonzero()
+            num_seqs = len(start_idices)
+            for i in range(num_seqs):
+                start_idx = start_idices[i].item()
+                if i < num_seqs - 1:
+                    end_idx = start_idices[i + 1].item()
+                else:
+                    end_idx = len(input_ids)
+                seq_lens.append(end_idx - start_idx)
+            kwargs["seq_lens"] = seq_lens
 
         global_attn_masks = []
         local_attn_masks = []
         start_idx = 0
         for seq_len in seq_lens:
-            end_idx = start_idx + seq_len
-            input_token_ids = input_ids[start_idx:end_idx]
-            start_idx = end_idx
+            if not is_hpu:
+                end_idx = start_idx + seq_len
+                input_token_ids = input_ids[start_idx:end_idx]
+                start_idx = end_idx
+                bs = 1
+            else:
+                input_token_ids = input_ids
             # Create a global causal mask.
             global_attn_mask = torch.empty(
-                1,
+                bs,
                 1,
                 seq_len,
                 seq_len,
@@ -676,11 +688,33 @@ class Gemma3ForConditionalGeneration(nn.Module, SupportsMultiModal, SupportsPP,
             # Consider the bidirectional attention between image tokens.
             img_mask = torch.zeros_like(global_attn_mask)
             img_pos = (input_token_ids == self.config.image_token_index)
-            img_mask[:, :, :, img_pos] += 1
-            img_mask[:, :, img_pos, :] += 1
-            global_attn_mask = torch.where(img_mask == 2, 0, global_attn_mask)
-            global_attn_masks.append(global_attn_mask)
 
+            if not is_hpu:
+                img_mask[:, :, :, img_pos] += 1
+                img_mask[:, :, img_pos, :] += 1
+                global_attn_mask = torch.where(img_mask == 2, 0,
+                                               global_attn_mask)
+            else:
+                img_mask[img_pos.unsqueeze(1)] += 1
+                img_mask = img_mask.permute(0, 1, 3, 2)
+                img_mask[img_pos.unsqueeze(1)] += 1
+                img_mask = img_mask.permute(0, 1, 3, 2)
+
+                img_pos_cum = torch.cumsum(img_pos, 1)
+                img_causal = torch.arange(seq_len,
+                    device = input_ids.device).unsqueeze(0) - \
+                    img_pos_cum + (img_pos_cum//IMG_TOKENS + 1) * IMG_TOKENS + 1
+                img_causal = torch.cat(
+                    (img_causal[:, 0:1] - 1, img_causal[:, :-1]), dim=1)
+                img_causal = img_causal.clamp_(min=0, max=seq_len -
+                                               1).unsqueeze(1).unsqueeze(3)
+                ind = torch.arange(seq_len, device=input_ids.device).unsqueeze(
+                    0).unsqueeze(1).unsqueeze(2)
+                img_mask[ind < img_causal] += 1
+                global_attn_mask = torch.where(img_mask == 3, 0,
+                                               global_attn_mask)
+
+            global_attn_masks.append(global_attn_mask)
             if self.sliding_window is not None:
                 # Create a local causal mask with sliding window (1024).
                 local_attn_mask = torch.ones_like(global_attn_mask)
@@ -701,8 +735,8 @@ class Gemma3ForConditionalGeneration(nn.Module, SupportsMultiModal, SupportsPP,
         return self.language_model.compute_logits(hidden_states,
                                                   sampling_metadata)
 
-    def load_weights(self, weights: Iterable[Tuple[str,
-                                                   torch.Tensor]]) -> Set[str]:
+    def load_weights(self, weights: Iterable[tuple[str,
+                                                   torch.Tensor]]) -> set[str]:
         loader = AutoWeightsLoader(self)
         return loader.load_weights(weights)
 
