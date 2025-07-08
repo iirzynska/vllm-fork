@@ -40,17 +40,17 @@ stages:
       - name: v1_gsm8k_small_g3_tp1_part1
         flavor: g3
         command: >-
-         export PT_HPU_LAZY_MODE=0 && export VLLM_T_COMPILE_FULLGRAPH=True && export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && 
+         export PT_HPU_LAZY_MODE=0 && export VLLM_T_COMPILE_FULLGRAPH=True && export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
          cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-small.txt -t 1
       - name: v1_gsm8k_small_g3_tp1_part2
         flavor: g3
         command: >-
-          export PT_HPU_LAZY_MODE=0 && export VLLM_T_COMPILE_FULLGRAPH=True && export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && 
+          export PT_HPU_LAZY_MODE=0 && export VLLM_T_COMPILE_FULLGRAPH=True && export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-small-2.txt -t 1
       - name: v1_gsm8k_small_g3_tp1_part3
         flavor: g3
         command: >-
-          export PT_HPU_LAZY_MODE=0 && export VLLM_T_COMPILE_FULLGRAPH=True && export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && 
+          export PT_HPU_LAZY_MODE=0 && export VLLM_T_COMPILE_FULLGRAPH=True && export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-small-3.txt -t 1
       - name: v1_gsm8k_small_g3_tp2
         flavor: g3.s
@@ -60,7 +60,7 @@ stages:
       - name: v1_gsm8k_small_g2_tp1
         flavor: g2
         command: >-
-         export PT_HPU_LAZY_MODE=0 && export VLLM_T_COMPILE_FULLGRAPH=True && export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && 
+         export PT_HPU_LAZY_MODE=0 && export VLLM_T_COMPILE_FULLGRAPH=True && export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
          cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-small.txt -t 1
       - name: v1_gsm8k_small_g2_tp2
         flavor: g2.s
@@ -70,7 +70,7 @@ stages:
       - name: v1_gsm8k_g2_deepseek-v2-lite_tp1
         flavor: g3
         command: >-
-          export PT_HPU_LAZY_MODE=0 && export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && 
+          export PT_HPU_LAZY_MODE=0 && export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-deepseek.txt -t 1
   - name: test_gsm8k_small_models_apc
     steps:
@@ -87,12 +87,12 @@ stages:
       - name: v1_gsm8k_small_g3_tp1_apc
         flavor: g3
         command: >-
-          export PT_HPU_LAZY_MODE=0 && export VLLM_CONTIGUOUS_PA=false && export VLLM_USE_V1=1 && 
+          export PT_HPU_LAZY_MODE=0 && export VLLM_CONTIGUOUS_PA=false && export VLLM_USE_V1=1 && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-small.txt -t 1 -a
       - name: v1_gsm8k_small_g2_tp1_apc
         flavor: g2
         command: >-
-          export PT_HPU_LAZY_MODE=0 && export VLLM_CONTIGUOUS_PA=false && export VLLM_USE_V1=1 && 
+          export PT_HPU_LAZY_MODE=0 && export VLLM_CONTIGUOUS_PA=false && export VLLM_USE_V1=1 && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           cd .jenkins/lm-eval-harness && bash run-tests.sh -c configs/models-small.txt -t 1 -a
   - name: test_gsm8k_large_models
     steps:
@@ -143,14 +143,14 @@ stages:
       - name: v1_gsm8k_small_g3_tp1_fp8
         flavor: g3
         command: >-
-          export VLLM_USE_V1=1 && 
+          export VLLM_USE_V1=1 && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           cd .jenkins/lm-eval-harness && 
           VLLM_T_COMPILE_FULLGRAPH=True PT_HPU_LAZY_MODE=0 
           bash run-tests.sh -c configs/models-fp8-g3-tp1.txt -t 1
       - name: v1_gsm8k_small_g3_tp2_fp8
         flavor: g3.s
         command: >-
-          export VLLM_USE_V1=1 && 
+          export VLLM_USE_V1=1 && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           cd .jenkins/lm-eval-harness &&
           VLLM_T_COMPILE_FULLGRAPH=True PT_HPU_LAZY_MODE=0 
           bash run-tests.sh -c configs/models-fp8.txt -t 2
@@ -189,7 +189,7 @@ stages:
       - name: v1_gsm8k_small_g2_tp1_spec_decode
         flavor: g2
         command: >-
-          export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && 
+          export VLLM_USE_V1=1 && export VLLM_CONTIGUOUS_PA=false && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           cd .jenkins/lm-eval-harness && 
           VLLM_T_COMPILE_FULLGRAPH=True PT_HPU_LAZY_MODE=0 
           bash run-tests.sh -c configs/models-mss.txt -t 1
@@ -213,16 +213,19 @@ stages:
       - name: v1_gsm8k_small_g2_tp1_mlp_spec_decode
         flavor: g2
         command: >-
+          export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           VLLM_T_COMPILE_FULLGRAPH=True PT_HPU_LAZY_MODE=0 TORCH_COMPILE_DISABLE=true VLLM_CONTIGUOUS_PA=false VLLM_SKIP_WARMUP=True VLLM_USE_V1=1 
           pytest -v tests/spec_decode/e2e/test_mlp_correctness.py::test_mlp_e2e_greedy_correctness 
       - name: v1_gsm8k_small_g2_tp1_medusa_spec_decode
         flavor: g2
         command: >-
+          export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           VLLM_T_COMPILE_FULLGRAPH=True PT_HPU_LAZY_MODE=0 TORCH_COMPILE_DISABLE=true VLLM_CONTIGUOUS_PA=false VLLM_SKIP_WARMUP=True VLLM_USE_V1=1 
           pytest -v tests/spec_decode/e2e/test_medusa_correctness.py::test_medusa_e2e_greedy_correctness
       - name: v1_gsm8k_small_g2_tp1_eagle_spec_decode
         flavor: g2
         command:  >
+          export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           VLLM_T_COMPILE_FULLGRAPH=True PT_HPU_LAZY_MODE=0 VLLM_COS_SIN_RECOMPUTE=true TORCH_COMPILE_DISABLE=true VLLM_CONTIGUOUS_PA=false VLLM_SKIP_WARMUP=True VLLM_USE_V1=1
           pytest -v tests/spec_decode/e2e/test_eagle_correctness.py::test_eagle_e2e_greedy_correctness
   - name: tests_lora
@@ -245,16 +248,19 @@ stages:
       - name: v1_test_llama_lora
         flavor: g2
         command:  >
+          export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           VLLM_T_COMPILE_FULLGRAPH=True PT_HPU_LAZY_MODE=0 VLLM_SKIP_WARMUP=true VLLM_USE_V1=1 
           pytest -v tests/lora/test_llama_hpu.py::test_llama_lora_1x
       - name: v1_test_multilora
         flavor: g2
         command: >-
+          export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           VLLM_T_COMPILE_FULLGRAPH=True PT_HPU_LAZY_MODE=0 VLLM_SKIP_WARMUP=true VLLM_USE_V1=1
           pytest -v tests/lora/test_multilora_hpu.py::test_llama_multilora_1x
       - name: v1_test_long_context
         flavor: g2
         command: >-
+          export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           VLLM_T_COMPILE_FULLGRAPH=True PT_HPU_LAZY_MODE=0 VLLM_SKIP_WARMUP=true VLLM_USE_V1=1 
           pytest -v tests/lora/test_long_context_hpu.py::test_quality
   - name: tests_multimodal
@@ -292,13 +298,13 @@ stages:
       - name: v1_multimodal_small_g3_tp1
         flavor: g3
         command: >-
-          cd .jenkins/vision && 
+          cd .jenkins/vision && export VLLM_WORKER_MULTIPROC_METHOD="spawn" && 
           VLLM_T_COMPILE_FULLGRAPH=False PT_HPU_LAZY_MODE=0 VLLM_USE_V1=1 
           bash run-tests.sh -c configs/models-small.txt -t 1
       - name: v1_multimodal_small_g3_tp2
         flavor: g3.s
         command: >-
-          cd .jenkins/vision &&
+          cd .jenkins/vision && 
           VLLM_T_COMPILE_FULLGRAPH=False PT_HPU_LAZY_MODE=0 VLLM_USE_V1=1 
           bash run-tests.sh -c configs/models-small.txt -t 2
       - name: v1_multimodal_llama4_scout_g3_tp2_ep
